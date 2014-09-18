@@ -43,6 +43,16 @@ namespace log4net.SignalR
             }
         }
         
+        protected override void OnClose()
+        {
+            base.OnClose();
+            if (this.hubConnection != null)
+            {
+                this.hubConnection.Dispose();
+                this.hubConnection = null;
+            }
+        }
+        
         private void EnsureConnection()
         {
             if (this.hubConnection == null)
