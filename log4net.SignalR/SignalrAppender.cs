@@ -12,32 +12,16 @@ namespace log4net.SignalR
 {
     public class SignalrAppender : AppenderSkeleton
     {
-        private string _proxyUrl = "";
         private IHubProxy proxyConnection;
+        
+        private HubConnection hubConnection;
 
         public SignalrAppender()
         {
             System.Diagnostics.Debug.WriteLine("Instantiating");
         }
 
-        public string ProxyUrl
-        {
-            get { return _proxyUrl; }
-            set
-            {
-                if (value != "")
-                {
-                    HubConnection connection = new HubConnection(value);
-                    proxyConnection = connection.CreateHubProxy(typeof(SignalrAppenderHub).Name);
-                    connection.Start().Wait();
-                }
-                else
-                {
-                    proxyConnection = null;
-                }
-                _proxyUrl = value;
-            }
-        }
+        public string ProxyUrl { get; set; }
 
         protected override void Append(LoggingEvent loggingEvent)
         {
@@ -49,13 +33,27 @@ namespace log4net.SignalR
 
             var logEntry = new LogEntry(formattedEvent, new JsonLoggingEventData(loggingEvent));
 
-            if (proxyConnection != null)
+            if (!string.IsNullOrEmpty(this.ProxyUrl))
             {
-                ProxyOnMessageLogged(logEntry);
+                this.SendLogEntryOverProxy(logEntry);
             }
             else
             {
                 this.SendLogEntryOverGlobalHost(logEntry);
+            }
+        }
+        
+        private void EnsureConnection()
+        {
+            if (this.hubConnection == null)
+            {
+                this.hubConnection = new HubConnection(this.ProxyUrl);
+                this.proxyConnection = this.hubConnection.CreateHubProxy(typeof(SignalrAppenderHub).Name);
+            }
+            
+            if (this.hubConnection.State == ConnectionState.Disconnected)
+            {
+                this.hubConnection.Start();
             }
         }
         
@@ -71,12 +69,16 @@ namespace log4net.SignalR
                 LogManager.GetLogger(string.Empty).Warn("SendLogEntryOverGlobalHost Failed:", e);
             }
         }
-        
-        private void ProxyOnMessageLogged(LogEntry entry)
+
+        private void SendLogEntryOverProxy(LogEntry entry)
         {
             try
             {
-                proxyConnection.Invoke("OnMessageLogged", entry);
+                this.EnsureConnection();
+                if (proxyConnection != null && this.hubConnection.State == ConnectionState.Connected)
+                {
+                    this.proxyConnection.Invoke("OnMessageLogged", entry);
+                }
             }
             catch (Exception e)
             {
