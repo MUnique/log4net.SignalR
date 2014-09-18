@@ -12,18 +12,13 @@ namespace log4net.SignalR
 {
     public class SignalrAppender : AppenderSkeleton
     {
-        public Action<LogEntry> MessageLogged;
-
         private string _proxyUrl = "";
         private IHubProxy proxyConnection;
 
         public SignalrAppender()
         {
             System.Diagnostics.Debug.WriteLine("Instantiating");
-            LocalInstance = this;
         }
-
-        public static SignalrAppender LocalInstance { get; private set; }
 
         public string ProxyUrl
         {
@@ -33,7 +28,7 @@ namespace log4net.SignalR
                 if (value != "")
                 {
                     HubConnection connection = new HubConnection(value);
-                    proxyConnection = connection.CreateHubProxy("signalrAppenderHub");
+                    proxyConnection = connection.CreateHubProxy(typeof(SignalrAppenderHub).Name);
                     connection.Start().Wait();
                 }
                 else
@@ -58,12 +53,25 @@ namespace log4net.SignalR
             {
                 ProxyOnMessageLogged(logEntry);
             }
-            else if (MessageLogged != null)
+            else
             {
-                MessageLogged(logEntry);
+                this.SendLogEntryOverGlobalHost(logEntry);
             }
         }
-
+        
+        private void SendLogEntryOverGlobalHost(LogEntry entry)
+        {
+            try
+            {
+                var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext(typeof(SignalrAppenderHub).Name);
+                hubContext.Clients.Group(SignalrAppenderHub.Log4NetGroup).onLoggedEvent(entry.FormattedEvent, entry.LoggingEvent);
+            }
+            catch (Exception e)
+            {
+                LogManager.GetLogger(string.Empty).Warn("SendLogEntryOverGlobalHost Failed:", e);
+            }
+        }
+        
         private void ProxyOnMessageLogged(LogEntry entry)
         {
             try
@@ -72,7 +80,7 @@ namespace log4net.SignalR
             }
             catch (Exception e)
             {
-                LogManager.GetLogger("").Warn("OnMessageLogged Failed:", e);
+                LogManager.GetLogger(string.Empty).Warn("OnMessageLogged Failed:", e);
             }
         }
     }

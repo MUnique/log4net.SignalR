@@ -9,11 +9,10 @@ namespace log4net.SignalR
 {
     public class SignalrAppenderHub : Hub
     {
-        private const string Log4NetGroup = "Log4NetGroup";
+        public const string Log4NetGroup = "Log4NetGroup";
 
         public SignalrAppenderHub()
         {
-            SignalrAppender.LocalInstance.MessageLogged = OnMessageLogged;
         }
 
         public void Listen()
