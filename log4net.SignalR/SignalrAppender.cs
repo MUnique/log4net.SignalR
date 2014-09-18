@@ -19,10 +19,16 @@ namespace log4net.SignalR
         public SignalrAppender()
         {
             System.Diagnostics.Debug.WriteLine("Instantiating");
+            this.HubName = typeof(SignalrAppenderHub).Name;
+            this.GroupName = SignalrAppenderHub.DefaultGroup;
         }
 
         public string ProxyUrl { get; set; }
-
+        
+        public string HubName { get; set; }
+        
+        public string GroupName { get; set; }
+        
         protected override void Append(LoggingEvent loggingEvent)
         {
             // LoggingEvent may be used beyond the lifetime of the Append()
@@ -33,13 +39,13 @@ namespace log4net.SignalR
 
             var logEntry = new LogEntry(formattedEvent, new JsonLoggingEventData(loggingEvent));
 
-            if (!string.IsNullOrEmpty(this.ProxyUrl))
+            if (string.IsNullOrEmpty(this.ProxyUrl))
             {
-                this.SendLogEntryOverProxy(logEntry);
+                this.SendLogEntryOverGlobalHost(logEntry);
             }
             else
             {
-                this.SendLogEntryOverGlobalHost(logEntry);
+                this.SendLogEntryOverProxy(logEntry);
             }
         }
         
@@ -58,7 +64,7 @@ namespace log4net.SignalR
             if (this.hubConnection == null)
             {
                 this.hubConnection = new HubConnection(this.ProxyUrl);
-                this.proxyConnection = this.hubConnection.CreateHubProxy(typeof(SignalrAppenderHub).Name);
+                this.proxyConnection = this.hubConnection.CreateHubProxy(this.HubName);
             }
             
             if (this.hubConnection.State == ConnectionState.Disconnected)
@@ -71,8 +77,8 @@ namespace log4net.SignalR
         {
             try
             {
-                var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext(typeof(SignalrAppenderHub).Name);
-                hubContext.Clients.Group(SignalrAppenderHub.Log4NetGroup).onLoggedEvent(entry.FormattedEvent, entry.LoggingEvent);
+                var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext(this.HubName);
+                hubContext.Clients.Group(this.GroupName).onLoggedEvent(entry.FormattedEvent, entry.LoggingEvent);
             }
             catch (Exception e)
             {
@@ -87,7 +93,7 @@ namespace log4net.SignalR
                 this.EnsureConnection();
                 if (proxyConnection != null && this.hubConnection.State == ConnectionState.Connected)
                 {
-                    this.proxyConnection.Invoke("OnMessageLogged", entry);
+                    this.proxyConnection.Invoke("OnMessageLogged", entry, this.GroupName);
                 }
             }
             catch (Exception e)
