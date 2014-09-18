@@ -13,7 +13,6 @@ namespace log4net.SignalR
     public class SignalrAppender : AppenderSkeleton
     {
         public Action<LogEntry> MessageLogged;
-        private FixFlags _fixFlags = FixFlags.All;
 
         private string _proxyUrl = "";
         private IHubProxy proxyConnection;
@@ -45,17 +44,11 @@ namespace log4net.SignalR
             }
         }
 
-        public virtual FixFlags Fix
-        {
-            get { return _fixFlags; }
-            set { _fixFlags = value; }
-        }
-
         protected override void Append(LoggingEvent loggingEvent)
         {
             // LoggingEvent may be used beyond the lifetime of the Append()
             // so we must fix any volatile data in the event
-            loggingEvent.Fix = Fix;
+            loggingEvent.Fix = FixFlags.All;
 
             var formattedEvent = RenderLoggingEvent(loggingEvent);
 
