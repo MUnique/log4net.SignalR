@@ -12,74 +12,93 @@ namespace log4net.SignalR
 {
     public class SignalrAppender : AppenderSkeleton
     {
-        public Action<LogEntry> MessageLogged;
-        private FixFlags _fixFlags = FixFlags.All;
-
-        private string _proxyUrl = "";
         private IHubProxy proxyConnection;
+        
+        private HubConnection hubConnection;
 
         public SignalrAppender()
         {
             System.Diagnostics.Debug.WriteLine("Instantiating");
-            LocalInstance = this;
+            this.HubName = typeof(SignalrAppenderHub).Name;
+            this.GroupName = SignalrAppenderHub.DefaultGroup;
         }
 
-        public static SignalrAppender LocalInstance { get; private set; }
-
-        public string ProxyUrl
-        {
-            get { return _proxyUrl; }
-            set
-            {
-                if (value != "")
-                {
-                    HubConnection connection = new HubConnection(value);
-                    proxyConnection = connection.CreateHubProxy("signalrAppenderHub");
-                    connection.Start().Wait();
-                }
-                else
-                {
-                    proxyConnection = null;
-                }
-                _proxyUrl = value;
-            }
-        }
-
-        public virtual FixFlags Fix
-        {
-            get { return _fixFlags; }
-            set { _fixFlags = value; }
-        }
-
+        public string ProxyUrl { get; set; }
+        
+        public string HubName { get; set; }
+        
+        public string GroupName { get; set; }
+        
         protected override void Append(LoggingEvent loggingEvent)
         {
             // LoggingEvent may be used beyond the lifetime of the Append()
             // so we must fix any volatile data in the event
-            loggingEvent.Fix = Fix;
+            loggingEvent.Fix = FixFlags.All;
 
             var formattedEvent = RenderLoggingEvent(loggingEvent);
 
             var logEntry = new LogEntry(formattedEvent, new JsonLoggingEventData(loggingEvent));
 
-            if (proxyConnection != null)
+            if (string.IsNullOrEmpty(this.ProxyUrl))
             {
-                ProxyOnMessageLogged(logEntry);
+                this.SendLogEntryOverGlobalHost(logEntry);
             }
-            else if (MessageLogged != null)
+            else
             {
-                MessageLogged(logEntry);
+                this.SendLogEntryOverProxy(logEntry);
             }
         }
-
-        private void ProxyOnMessageLogged(LogEntry entry)
+        
+        protected override void OnClose()
+        {
+            base.OnClose();
+            if (this.hubConnection != null)
+            {
+                this.hubConnection.Dispose();
+                this.hubConnection = null;
+            }
+        }
+        
+        private void EnsureConnection()
+        {
+            if (this.hubConnection == null)
+            {
+                this.hubConnection = new HubConnection(this.ProxyUrl);
+                this.proxyConnection = this.hubConnection.CreateHubProxy(this.HubName);
+            }
+            
+            if (this.hubConnection.State == ConnectionState.Disconnected)
+            {
+                this.hubConnection.Start();
+            }
+        }
+        
+        private void SendLogEntryOverGlobalHost(LogEntry entry)
         {
             try
             {
-                proxyConnection.Invoke("OnMessageLogged", entry);
+                var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext(this.HubName);
+                hubContext.Clients.Group(this.GroupName).onLoggedEvent(entry.FormattedEvent, entry.LoggingEvent);
             }
             catch (Exception e)
             {
-                LogManager.GetLogger("").Warn("OnMessageLogged Failed:", e);
+                LogManager.GetLogger(string.Empty).Warn("SendLogEntryOverGlobalHost Failed:", e);
+            }
+        }
+
+        private void SendLogEntryOverProxy(LogEntry entry)
+        {
+            try
+            {
+                this.EnsureConnection();
+                if (proxyConnection != null && this.hubConnection.State == ConnectionState.Connected)
+                {
+                    this.proxyConnection.Invoke("OnMessageLogged", entry, this.GroupName);
+                }
+            }
+            catch (Exception e)
+            {
+                LogManager.GetLogger(string.Empty).Warn("OnMessageLogged Failed:", e);
             }
         }
     }

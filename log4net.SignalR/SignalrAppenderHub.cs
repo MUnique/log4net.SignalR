@@ -9,21 +9,32 @@ namespace log4net.SignalR
 {
     public class SignalrAppenderHub : Hub
     {
-        private const string Log4NetGroup = "Log4NetGroup";
-
-        public SignalrAppenderHub()
+        public static string DefaultGroup
         {
-            SignalrAppender.LocalInstance.MessageLogged = OnMessageLogged;
+            get
+            {
+                return "Log4NetGroup";
+            }
         }
 
         public void Listen()
         {
-            Groups.Add(Context.ConnectionId, Log4NetGroup);
+            this.Listen(DefaultGroup);
+        }
+        
+        public virtual void Listen(string groupName)
+        {
+            this.Groups.Add(Context.ConnectionId, groupName);
         }
 
         public void OnMessageLogged(LogEntry e)
         {
-            Clients.Group(Log4NetGroup).onLoggedEvent(e.FormattedEvent, e.LoggingEvent);
+            this.OnMessageLogged(e, DefaultGroup);
+        }
+        
+        public virtual void OnMessageLogged(LogEntry e, string groupName)
+        {
+            this.Clients.Group(groupName).onLoggedEvent(e.FormattedEvent, e.LoggingEvent);
         }
     }
 }
