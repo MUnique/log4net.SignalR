@@ -1,25 +1,28 @@
-#log4net.SignalR
-## Log4Net Appender for sending log events from server to browser
+# log4net.SignalR
 
-**log4net.SignalR** is a [Log4Net Appender](http://logging.apache.org/log4net/release/manual/introduction.html#appenders) that sends Log4Net events logged on the server to a JavaScript function in the browser.  It uses the [SignalR](https://github.com/SignalR/SignalR) async signaling library to stream these events in real-time over a persistent connection between the server and client.
 
-The main use case for log4net.SignalR is building a log viewer on your site that gives easy visibility to diagnostic information and errors logged on the server.  (However, you probably won't want to use it in production in case your logs include sensitive information.)
+**log4net.SignalR** is a [Log4Net Appender](http://logging.apache.org/log4net/release/manual/introduction.html#appenders) 
+that forwards Log4Net events to a SignalR hub. From this hub it gets forwarded to its registered SignalR clients, e.g. to a JavaScript client in the browser.
+It uses the [SignalR](https://github.com/SignalR/SignalR) async signaling library to stream these events in real-time over a persistent connection between the server and client.
 
-###Feedback
+The main use case for log4net.SignalR is building a log viewer on your website that gives easy visibility to diagnostic information and errors logged on the server.
 
-Questions or feedback? Tweet me: [@ChrisFulstow](http://twitter.com/#!/ChrisFulstow)
 
-##Getting started
+## Getting started
 
-Getting started is easy.  You can also check out the bundled MvcExample project to see some examples.
+Getting started is easy. You can also check out the bundled MvcExample project to see how it works.
 
-###Add log4net.SignalR.dll
+### Add log4net.SignalR.dll
 
-Add the compiled log4net.SignalR.dll assembly or the source files to your project.
+Add the compiled log4net.SignalR.dll assembly or the source files to your project. 
+The easiest way is to use the nuget package, because it adds all the required dependencies itself. The package name is munique.log4net.signalr.appender and can be added with the following command in the Package Manager Console:
 
-###Configure log4net.SignalR as a Log4Net appender to a self-hosted hub (for example, messages logged from within a web application)
+* `Tools --> NuGet Package Manager --> Package Manager Console`
+* Run ``Install-Package munique.log4net.signalr.appender``
 
-Configure the SignalrAppender as an output destination for your log events by adding this to your log4net configuration (usually web.config):
+### Configure log4net.SignalR as a Log4Net appender
+#### Self Hosted Hub
+Configure log4net.SignalR as a Log4Net appender to a self-hosted hub (for example, messages logged from within a web application) by adding this to your log4net configuration (usually web.config):
 
 ```xml
 <configSections>
@@ -38,9 +41,8 @@ Configure the SignalrAppender as an output destination for your log events by ad
 </log4net>
 ```
 
-###Configure log4net.SignalR as a Log4Net appender to a remotely hosted hub (for example, messages logged from a console application, but displayed in a web application)
-
-Configure the SignalrAppender as an output destination for your log events by adding this to your log4net configuration (usually log4net.config or app.config):
+#### Remotely hosted hub
+Configure log4net.SignalR as a Log4Net appender to a remotely hosted hub, e.g. messages logged from a console application, but displayed in a web application (usually log4net.config or app.config):
 
 ```xml
 <configSections>
@@ -60,9 +62,10 @@ Configure the SignalrAppender as an output destination for your log events by ad
 </log4net>
 ```
 
-###Set up a page to listen for events
 
-Add some jQuery to your ASP.NET page to listen out for events raised on the server.  Once the SignalrAppender is set up, all events logged on the server using Log4Net will be transmitted to the browser by executing a JavaScript function.
+### Usage Example: Set up a page to listen for events
+
+Add some jQuery to your web page to listen out for events raised on the server. Once the SignalrAppender is set up, all events logged on the server using Log4Net will be transmitted to the hub and a browser can listen to it by executing a JavaScript function.
 
 Here we're adding each event's details to an HTML table, but you can use the `onLoggedEvent` callback and the log details passed in the `loggedEvent` parameter object to do anything you like.
 
@@ -86,7 +89,63 @@ Here we're adding each event's details to an HTML table, but you can use the `on
     });
 ```
 
-###To test the MVC example
+
+### Hub Name and Group
+Additionally you can specifiy a hub name, and a group name. This way you can use more than one SignalR appender, e.g. to provide different appenders for different parts of your application or to provide only specific log messages to a specific group of clients.
+
+The hub name is the name of the appender type. The default name is "SignalrAppenderHub". You can inherit from it in your hosting application if you need additional hubs:
+
+```c#
+public class MyHub : log4net.SignalR.SignalrAppenderHub 
+{
+}
+```
+
+The default group name is "Log4NetGroup". E.g. we set it to "MyGroup" in the configuration as well as the hub name:
+
+```xml
+<configSections>
+  <section name="log4net" type="log4net.Config.Log4NetConfigurationSectionHandler, log4net" />
+</configSections>
+
+<log4net debug="true">
+    <appender name="SignalrAppender" type="log4net.SignalR.SignalrAppender, log4net.SignalR">
+        <HubName>MyHub</HubName>
+        <GroupName>MyGroup</GroupName>
+        <layout type="log4net.Layout.PatternLayout">
+            <conversionPattern value="%date %-5level - %message%newline" />
+        </layout>
+    </appender>
+    <root>
+        <appender-ref ref="SignalrAppender" />
+    </root>
+</log4net>
+```
+
+To listen to the hub of this appender, we have to specify the hub name and the group accordingly in the SignalR client, e.g. Javascript:
+
+
+```javascript
+    $(function () {
+        var log4net = $.connection.myHub; // <-- HubName goes here
+
+        log4net.client.onLoggedEvent = function (loggedEvent) {
+            var dateCell = $("<td>").css("white-space", "nowrap").text(loggedEvent.TimeStamp);
+            var levelCell = $("<td>").text(loggedEvent.Level);
+            var detailsCell = $("<td>").text(loggedEvent.Message);
+            var row = $("<tr>").append(dateCell, levelCell, detailsCell);
+            $('#log-table tbody').append(row);
+        };
+
+        $.connection.hub.logging = true; // turn signalr console logging on/off
+
+        $.connection.hub.start(function() {
+            log4net.server.listen('MyGroup'); // <- GroupName goes here
+        });
+    });
+```
+
+#### To test the MVC example
 Open up two browser windows/tabs. Keep one tab on the initial page. Use the other tab instance to navigate. You will see the log4net messages accumulate in the first tab.
 
 ### A note about running the SignalrAppenderHub within an ASP.Net web application
