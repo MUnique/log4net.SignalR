@@ -1,29 +1,32 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>log4net.signalr.appender</id>
+    <id>munique.log4net.signalr.appender</id>
     <version>1.0.0</version>
-    <title>log4net.signalr</title>
-    <authors>Chris Fulstow</authors>
+    <title>MUnique.log4net.SignalR</title>
+    <authors>MUnique</authors>
     <owners></owners>
     <description>
-        log4net.SignalR is a Log4Net Appender that sends Log4Net events logged on the server to a JavaScript function in the browser. It uses the SignalR async signaling library to stream these events in real-time over a persistent connection between the server and client.
-        The main use case for log4net.SignalR is building a log viewer on your site that gives easy visibility to diagnostic information and errors logged on the server. (However, you probably won't want to use it in production in case your logs include sensitive information.)
+        log4net.SignalR is a Log4Net Appender that forwards Log4Net events to a SignalR hub. From this hub it gets forwarded to its registered SignalR clients, e.g. to a JavaScript client in the browser. 
+        It uses the SignalR async signaling library to stream these events in real-time over a persistent connection between the server and client.
+        The main use case for log4net.SignalR is building a log viewer on your website that gives easy visibility to diagnostic information and errors logged on the server.
     </description>
     <releaseNotes>
     </releaseNotes>
-    <summary>
-        Log4Net Appender for sending log events from server to browser
-    </summary>
+    <summary>Log4Net Appender which forwards log events to a SignalR hub.</summary>
     <language>en-US</language>
-    <projectUrl>https://github.com/ChrisFulstow/log4net.SignalR</projectUrl>
+    <projectUrl>https://github.com/MUnique/log4net.SignalR</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <licenseUrl>http://opensource.org/licenses/mit-license.php</licenseUrl>
-    <copyright>Copyright 2014</copyright>
+    <copyright>Copyright 2016</copyright>
     <dependencies>
-        <group targetFramework="net45">
-          
-        </group>
+      <group targetFramework="net46">
+      </group>
+      <group>
+        <dependency id="log4net" version="2.0.5" />
+        <dependency id="Microsoft.AspNet.SignalR.Client" version="2.2.0" />
+        <dependency id="Microsoft.AspNet.SignalR.Core" version="2.2.0" />
+      </group>
     </dependencies>
     <references></references>
     <tags></tags>
