@@ -102,9 +102,9 @@
     $(function() {
         var log4net = $.connection.signalrAppenderHub;
 
-        log4net.client.onLoggedEvent = function(formattedEvent, loggedEvent) {
+        log4net.client.onLoggedEvent = function(formattedEvent, loggedEvent, id) {
             if (console && console.log)
-                console.log("onLoggedEvent", formattedEvent, loggedEvent);
+                console.log("onLoggedEvent", formattedEvent, loggedEvent, id);
 
             var dtm = new Date(Date.parse(loggedEvent.TimeStamp));
             var dateCell = $("<td>").css("white-space", "nowrap").text(printValue(dtm));
