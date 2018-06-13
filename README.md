@@ -73,7 +73,7 @@ Here we're adding each event's details to an HTML table, but you can use the `on
     $(function () {
         var log4net = $.connection.signalrAppenderHub;
 
-        log4net.client.onLoggedEvent = function (loggedEvent) {
+        log4net.client.onLoggedEvent = function (formattedEvent, loggedEvent, id) {
             var dateCell = $("<td>").css("white-space", "nowrap").text(loggedEvent.TimeStamp);
             var levelCell = $("<td>").text(loggedEvent.Level);
             var detailsCell = $("<td>").text(loggedEvent.Message);
@@ -89,6 +89,10 @@ Here we're adding each event's details to an HTML table, but you can use the `on
     });
 ```
 
+The parameters of `onLoggedEvent` are simply:
+  * formattedEvent: The log entry formatted as string as configured in your log4net configuration
+  * loggedEvent: An object which contains details about the logged event, such as `Message`, `Level`, `TimeStamp` or `ExceptionString`.
+  * id: Sequentially ordered identifier. May be helpful if you want to cache log messages and later retrieve them by a client which connects after the event happend.
 
 ### Hub Name and Group
 Additionally you can specifiy a hub name, and a group name. This way you can use more than one SignalR appender, e.g. to provide different appenders for different parts of your application or to provide only specific log messages to a specific group of clients.
