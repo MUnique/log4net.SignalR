@@ -1,6 +1,7 @@
 #region Using directives
 
 using System;
+using System.Threading;
 using log4net.Appender;
 using log4net.Core;
 using Microsoft.AspNet.SignalR.Client;
@@ -15,6 +16,8 @@ namespace log4net.SignalR
         private IHubProxy proxyConnection;
         
         private HubConnection hubConnection;
+
+        private long currentId;
 
         public SignalrAppender()
         {
@@ -36,8 +39,8 @@ namespace log4net.SignalR
             loggingEvent.Fix = FixFlags.All;
 
             var formattedEvent = RenderLoggingEvent(loggingEvent);
-
-            var logEntry = new LogEntry(formattedEvent, new JsonLoggingEventData(loggingEvent));
+            var id = Interlocked.Increment(ref this.currentId);
+            var logEntry = new LogEntry(id, formattedEvent, new JsonLoggingEventData(loggingEvent));
 
             if (string.IsNullOrEmpty(this.ProxyUrl))
             {
@@ -77,8 +80,7 @@ namespace log4net.SignalR
         {
             try
             {
-                var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext(this.HubName);
-                hubContext.Clients.Group(this.GroupName).onLoggedEvent(entry.FormattedEvent, entry.LoggingEvent);
+                SignalrAppenderHub.SendOnMessageLoggedByGlobalHost(entry, this.HubName, this.GroupName);
             }
             catch (Exception e)
             {
@@ -93,7 +95,7 @@ namespace log4net.SignalR
                 this.EnsureConnection();
                 if (proxyConnection != null && this.hubConnection.State == ConnectionState.Connected)
                 {
-                    this.proxyConnection.Invoke("OnMessageLogged", entry, this.GroupName);
+                    this.proxyConnection.Invoke(nameof(SignalrAppenderHub.OnMessageLogged), entry, this.GroupName);
                 }
             }
             catch (Exception e)
@@ -103,16 +105,37 @@ namespace log4net.SignalR
         }
     }
 
-
+    /// <summary>
+    /// A log entry which is sent to the client.
+    /// </summary>
     public class LogEntry
     {
-        public LogEntry(string formttedEvent, JsonLoggingEventData loggingEvent)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LogEntry"/> class.
+        /// </summary>
+        /// <param name="id">The unique identifier which is a sequence number.</param>
+        /// <param name="formttedEvent">The formtted event as configured in the settings.</param>
+        /// <param name="loggingEvent">The logging event data.</param>
+        public LogEntry(long id, string formttedEvent, JsonLoggingEventData loggingEvent)
         {
-            FormattedEvent = formttedEvent;
-            LoggingEvent = loggingEvent;
+            this.Id = id;
+            this.FormattedEvent = formttedEvent;
+            this.LoggingEvent = loggingEvent;
         }
 
+        /// <summary>
+        /// Gets or sets the unique identifier (sequence number).
+        /// </summary>
+        public long Id { get; set; }
+
+        /// <summary>
+        /// Gets or sets the event as formatted text as configured in the settings.
+        /// </summary>
         public string FormattedEvent { get; set; }
+
+        /// <summary>
+        /// Gets or sets the logging event data.
+        /// </summary>
         public JsonLoggingEventData LoggingEvent { get; set; }
     }
 }

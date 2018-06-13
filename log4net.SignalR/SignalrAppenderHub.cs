@@ -1,5 +1,6 @@
 #region Using directives
 
+using System;
 using Microsoft.AspNet.SignalR;
 
 #endregion
@@ -7,15 +8,45 @@ using Microsoft.AspNet.SignalR;
 
 namespace log4net.SignalR
 {
-    public class SignalrAppenderHub : Hub
+    /// <summary>
+    /// Client interface for the <see cref="SignalrAppenderHubBase{TClient}"/>.
+    /// </summary>
+    public interface ISignalrAppenderHubClient
     {
-        public static string DefaultGroup
+        void OnLoggedEvent(string formattedEvent, JsonLoggingEventData entry, long id);
+    }
+
+    public class OnMessageLoggedEventArgs : EventArgs
+    {
+        public OnMessageLoggedEventArgs(string hubName, string groupName, LogEntry entry)
         {
-            get
-            {
-                return "Log4NetGroup";
-            }
+            HubName = hubName;
+            GroupName = groupName;
+            Entry = entry;
         }
+
+        public string HubName { get; }
+
+        public string GroupName { get; }
+
+        public LogEntry Entry { get; }
+    }
+
+    public class SignalrAppenderHub : SignalrAppenderHubBase<ISignalrAppenderHubClient>
+    {
+        public static event EventHandler<OnMessageLoggedEventArgs> OnMessageLoggedByGlobalHost;
+        public static void SendOnMessageLoggedByGlobalHost(LogEntry entry, string hubName, string groupName = DefaultGroup)
+        {
+            var hubContext = Microsoft.AspNet.SignalR.GlobalHost.ConnectionManager.GetHubContext<ISignalrAppenderHubClient>(hubName);
+            hubContext.Clients.Group(groupName).OnLoggedEvent(entry.FormattedEvent, entry.LoggingEvent, entry.Id);
+            OnMessageLoggedByGlobalHost?.Invoke(hubContext, new OnMessageLoggedEventArgs(hubName, groupName, entry));
+        }
+    }
+
+    public abstract class SignalrAppenderHubBase<TClient> : Hub<TClient>
+        where TClient: class, ISignalrAppenderHubClient
+    {
+        public const string DefaultGroup = "Log4NetGroup";
 
         public void Listen()
         {
@@ -34,7 +65,7 @@ namespace log4net.SignalR
         
         public virtual void OnMessageLogged(LogEntry e, string groupName)
         {
-            this.Clients.Group(groupName).onLoggedEvent(e.FormattedEvent, e.LoggingEvent);
+            this.Clients.Group(groupName).OnLoggedEvent(e.FormattedEvent, e.LoggingEvent, e.Id);
         }
     }
 }
